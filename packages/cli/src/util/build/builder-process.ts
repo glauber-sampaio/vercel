@@ -269,6 +269,41 @@ function isSharedRef(value: unknown): value is { __sharedRef: number } {
   );
 }
 
+/**
+ * Prepends `[vc:service:<name>] ` to each complete line read from a child's stdout/stderr and
+ * forwards it to `dest`. Buffers an unterminated trailing line until more data arrives (or the
+ * `flush` on stream end), so the tag only ever lands at real line starts. Must stay in sync with
+ * the tag matcher in api/build-container/container/src/utils/logging.ts.
+ */
+export function createServiceLinePrefixer(
+  serviceName: string,
+  dest: Pick<NodeJS.WriteStream, 'write'>
+): { onData: (chunk: string) => void; flush: () => void } {
+  const tag = `[vc:service:${serviceName}] `;
+  let pending = '';
+  return {
+    onData(chunk: string) {
+      pending += chunk;
+      const newlineIndex = pending.lastIndexOf('\n');
+      if (newlineIndex === -1) return;
+      const complete = pending.slice(0, newlineIndex + 1);
+      pending = pending.slice(newlineIndex + 1);
+      const tagged = complete
+        .split('\n')
+        .slice(0, -1)
+        .map(line => `${tag}${line}`)
+        .join('\n');
+      dest.write(`${tagged}\n`);
+    },
+    flush() {
+      if (pending.length > 0) {
+        dest.write(`${tag}${pending}`);
+        pending = '';
+      }
+    },
+  };
+}
+
 export interface BuildInSubprocessOptions {
   /** Absolute path to the builder module entrypoint (BuilderWithPkg.path). */
   requirePath: string;
@@ -289,14 +324,21 @@ export interface BuildInSubprocessOptions {
    * surface their spans without polluting the thrown error.
    */
   reportTraceEvents?: (events: TraceEvent[]) => void;
+  /**
+   * When set, every stdout/stderr line the build produces is prefixed with
+   * `[vc:service:<name>] ` before reaching the terminal. The Vercel build-container strips this
+   * tag and uses it to attribute each build log line to a service.
+   */
+  serviceName?: string;
 }
 
 /**
  * Fork a worker, run one build, and return the deserialized result. `buildOptions.span` is
  * dropped (a class instance that can't be serialized); the caller keeps its own tracing.
  *
- * The child inherits stdout/stderr so its build output reaches the terminal directly, matching
- * the previous in-process behavior.
+ * When `serviceName` is set, the child's stdout/stderr are piped so the parent can prefix each
+ * line with the service tag before forwarding to the terminal (covering the builder's own output
+ * and any subprocess it spawns). Otherwise the child inherits stdout/stderr and writes directly.
  */
 export async function buildInSubprocess({
   requirePath,
@@ -305,6 +347,7 @@ export async function buildInSubprocess({
   cwd,
   expectsPreDeploy,
   reportTraceEvents,
+  serviceName,
 }: BuildInSubprocessOptions): Promise<BuildInSubprocessResult> {
   const workerPath = join(__dirname, 'builder-worker.cjs');
 
@@ -315,9 +358,34 @@ export async function buildInSubprocess({
     cwd,
     execArgv: [],
     env,
+    // Pipe stdout/stderr (keeping stdin inherited and the IPC channel) only when we need to
+    // tag lines; otherwise inherit so output goes straight to the terminal.
+    stdio: serviceName
+      ? ['inherit', 'pipe', 'pipe', 'ipc']
+      : ['inherit', 'inherit', 'inherit', 'ipc'],
   });
 
+  // When piping, read the child's streams line-by-line, prefix with the service tag, and
+  // forward to our own stdout/stderr. Flushed on teardown so a trailing partial line isn't lost.
+  const stdoutPrefixer = serviceName
+    ? createServiceLinePrefixer(serviceName, process.stdout)
+    : undefined;
+  const stderrPrefixer = serviceName
+    ? createServiceLinePrefixer(serviceName, process.stderr)
+    : undefined;
+  if (stdoutPrefixer && child.stdout) {
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => stdoutPrefixer.onData(chunk));
+  }
+  if (stderrPrefixer && child.stderr) {
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', chunk => stderrPrefixer.onData(chunk));
+  }
+
   const teardown = () => {
+    // Emit any buffered trailing (unterminated) line before we stop reading the streams.
+    stdoutPrefixer?.flush();
+    stderrPrefixer?.flush();
     if (child.connected) child.disconnect();
     if (child.exitCode === null && child.signalCode === null) {
       child.kill();

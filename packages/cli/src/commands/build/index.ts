@@ -1432,6 +1432,9 @@ async function doBuild(
                 env: process.env,
                 cwd: buildWorkPath,
                 expectsPreDeploy: Boolean(preDeployCmd),
+                // Tag every build-output line with the service so the build-container can
+                // attribute it. Only when this build belongs to a service.
+                serviceName: service?.name,
                 // Report the builder's in-worker spans under this `vc.builder` span so forked
                 // builds keep full trace fidelity (called on success and failure).
                 // reportChildEvents reparents the worker's root span under `vc.builder`.
