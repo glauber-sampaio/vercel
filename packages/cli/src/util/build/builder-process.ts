@@ -366,7 +366,7 @@ export async function buildInSubprocess({
   });
 
   // When piping, read the child's streams line-by-line, prefix with the service tag, and
-  // forward to our own stdout/stderr. Flushed on teardown so a trailing partial line isn't lost.
+  // forward to our own stdout/stderr. Flushed on stream end so a trailing partial line isn't lost.
   const stdoutPrefixer = serviceName
     ? createServiceLinePrefixer(serviceName, process.stdout)
     : undefined;
@@ -376,16 +376,20 @@ export async function buildInSubprocess({
   if (stdoutPrefixer && child.stdout) {
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', chunk => stdoutPrefixer.onData(chunk));
+    // Flush the trailing (unterminated) line only once the stream reaches EOF, so we never
+    // split a line that is still arriving. The child's stdout/stderr are piped over separate
+    // file descriptors from the IPC channel, so data written just before the worker sends its
+    // `buildResult` message can still be sitting in the OS pipe buffer when the parent tears
+    // the worker down; flushing here (rather than in teardown) guarantees it isn't dropped.
+    child.stdout.on('end', () => stdoutPrefixer.flush());
   }
   if (stderrPrefixer && child.stderr) {
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', chunk => stderrPrefixer.onData(chunk));
+    child.stderr.on('end', () => stderrPrefixer.flush());
   }
 
   const teardown = () => {
-    // Emit any buffered trailing (unterminated) line before we stop reading the streams.
-    stdoutPrefixer?.flush();
-    stderrPrefixer?.flush();
     if (child.connected) child.disconnect();
     if (child.exitCode === null && child.signalCode === null) {
       child.kill();
