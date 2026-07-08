@@ -31,7 +31,7 @@ export interface DeploymentUrlOptions {
 export interface DeploymentUrlResult {
   fullUrl: string;
   deploymentProtectionToken: string | null;
-  link: ProjectLinked;
+  link: ProjectLinked | null;
 }
 
 export interface CommandSetupResult {
@@ -465,6 +465,46 @@ export async function getDeploymentUrlAndToken(
     throw err;
   }
 
+  if (deploymentFlag) {
+    const accountId = scope.team?.id || scope.user.id;
+    const deploymentUrl = await getDeploymentUrlById(
+      client,
+      deploymentFlag,
+      accountId
+    );
+    if (!deploymentUrl) {
+      output.error(`No deployment found for ID "${deploymentFlag}"`);
+      return 1;
+    }
+
+    const fullUrl = `${deploymentUrl}${path.startsWith('/') ? path : `/${path}`}`;
+    output.debug(`${chalk.cyan('Target URL:')} ${chalk.bold(fullUrl)}`);
+
+    let link: ProjectLinked | null = null;
+    let deploymentProtectionToken = protectionBypassFlag ?? null;
+
+    if (protectionBypassFlag === undefined) {
+      link = await resolveProjectFromUrl(client, fullUrl);
+      if (link?.project.id) {
+        try {
+          deploymentProtectionToken =
+            await getOrCreateDeploymentProtectionToken(client, link);
+        } catch (err) {
+          output.error(
+            `Failed to get deployment protection bypass token: ${err instanceof Error ? err.message : String(err)}`
+          );
+          return 1;
+        }
+      }
+    }
+
+    return {
+      fullUrl,
+      deploymentProtectionToken,
+      link,
+    };
+  }
+
   try {
     link = await ensureLink(commandName, client, client.cwd, {
       autoConfirm,
@@ -507,27 +547,11 @@ export async function getDeploymentUrlAndToken(
   const backupAlias = linkedProject.project.latestDeployments?.[0]?.url;
   const target = preferredAlias || backupAlias;
 
-  let baseUrl: string;
-
-  if (deploymentFlag) {
-    // Get the accountId from the scope (team or user)
-    const accountId = scope.team?.id || scope.user.id;
-    const deploymentUrl = await getDeploymentUrlById(
-      client,
-      deploymentFlag,
-      accountId
-    );
-    if (!deploymentUrl) {
-      output.error(`No deployment found for ID "${deploymentFlag}"`);
-      return 1;
-    }
-    baseUrl = deploymentUrl;
-  } else if (target) {
-    baseUrl = `https://${target}`;
-  } else {
+  if (!target) {
     throw new Error('No deployment URL found for the project');
   }
 
+  const baseUrl = `https://${target}`;
   const fullUrl = `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 
   output.debug(`${chalk.cyan('Target URL:')} ${chalk.bold(fullUrl)}`);

@@ -371,7 +371,9 @@ describe('curl', () => {
     });
 
     it('should accept a full deployment URL', async () => {
-      await setupLinkedProject();
+      client.cwd = setupTmpDir();
+      useUser();
+      useTeams('team_dummy');
 
       client.setArgv(
         'curl',
@@ -385,6 +387,16 @@ describe('curl', () => {
       const exitCode = await curl(client);
 
       expect(exitCode).toEqual(0);
+      expect(spawnMock).toHaveBeenCalledWith(
+        'curl',
+        [
+          '--url',
+          'https://deployment-xyz789.vercel.app/api/hello',
+          '--header',
+          'x-vercel-protection-bypass: test-secret',
+        ],
+        { stdio: 'inherit', shell: false }
+      );
       expect(client.telemetryEventStore).toHaveTelemetryEvents([
         {
           key: 'argument:path',
