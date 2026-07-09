@@ -13,6 +13,11 @@ import { printProjectNotFoundError } from '../projects/project-not-found-error';
 interface EnsureLinkOptions extends SetupAndLinkOptions {
   /** When true, fail instead of setting up a project that is not linked. */
   requireExistingLink?: boolean;
+  /**
+   * Deploy-only fallback for project-scoped tokens that can fetch the linked
+   * project but cannot fetch the owner user/team resource.
+   */
+  allowOwnerLookupFallback?: boolean;
 }
 
 /**
@@ -58,7 +63,8 @@ export async function ensureLink(
         client,
         cwd,
         opts.projectName,
-        opts.failIfNotFound
+        opts.failIfNotFound,
+        { allowOwnerLookupFallback: opts.allowOwnerLookupFallback }
       );
     }
     opts.link = link;
