@@ -19,6 +19,10 @@ import { getFlagsSpecification } from '../../util/get-flags-specification';
 import { printError } from '../../util/error';
 import { help } from '../help';
 import { getCommandName } from '../../util/pkg-name';
+import {
+  GLOBAL_CLI_FLAG_NAMES,
+  globalCliFlagTakesValue,
+} from '../../util/arg-common';
 import type { Command } from '../help';
 import type arg from 'arg';
 
@@ -62,7 +66,9 @@ function orgFromOwner(id: string, slug = id): ProjectLinked['org'] {
 
 const VC_STRING_FLAGS = new Set(['--deployment', '--protection-bypass']);
 const VC_BOOLEAN_FLAGS = new Set(['--yes', '--help', '--trace', '--json']);
-const VC_SCOPE_FLAGS = new Set(['--scope', '--team']);
+const VC_GLOBAL_LONG_FLAGS = new Set(
+  [...GLOBAL_CLI_FLAG_NAMES].filter(name => name.startsWith('--'))
+);
 
 function flagName(arg: string): string {
   const eqIdx = arg.indexOf('=');
@@ -103,7 +109,26 @@ export function parseCurlLikeArgs(
     json: false,
     toolFlags: [] as string[],
   };
-  const args = rawArgs[0] === commandName ? rawArgs.slice(1) : [...rawArgs];
+  const args = [...rawArgs];
+  let commandIndex = 0;
+  while (commandIndex < args.length) {
+    const arg = args[commandIndex];
+    const name = flagName(arg);
+    if (!VC_GLOBAL_LONG_FLAGS.has(name)) {
+      break;
+    }
+    commandIndex++;
+    if (
+      !arg.includes('=') &&
+      globalCliFlagTakesValue(name) &&
+      commandIndex < args.length
+    ) {
+      commandIndex++;
+    }
+  }
+  if (args[commandIndex] === commandName) {
+    args.splice(commandIndex, 1);
+  }
   const separatorIndex = args.indexOf('--');
   const beforeSeparator =
     separatorIndex === -1 ? args : args.slice(0, separatorIndex);
@@ -113,17 +138,6 @@ export function parseCurlLikeArgs(
   for (let i = 0; i < beforeSeparator.length; i++) {
     const arg = beforeSeparator[i];
     const name = flagName(arg);
-
-    // Scope flags are parsed globally by the CLI, but remain in `client.argv`.
-    // Consume their values here so they are not forwarded to curl. We do not
-    // consume the short forms because `-S` and `-T` are valid curl flags.
-    if (VC_SCOPE_FLAGS.has(name)) {
-      const value = flagValue(beforeSeparator, i);
-      if (!arg.includes('=') && value !== undefined) {
-        i++;
-      }
-      continue;
-    }
 
     if (VC_STRING_FLAGS.has(name)) {
       const value = flagValue(beforeSeparator, i);
@@ -147,6 +161,22 @@ export function parseCurlLikeArgs(
         result.json = true;
       } else {
         result.help = true;
+      }
+      continue;
+    }
+
+    // Global flags are parsed by the CLI, but remain in `client.argv`. Consume
+    // their values here so they are not forwarded to curl. We intentionally do
+    // not consume short forms because flags such as `-d`, `-S`, and `-T` belong
+    // to curl too.
+    if (VC_GLOBAL_LONG_FLAGS.has(name)) {
+      const value = flagValue(beforeSeparator, i);
+      if (
+        !arg.includes('=') &&
+        globalCliFlagTakesValue(name) &&
+        value !== undefined
+      ) {
+        i++;
       }
       continue;
     }

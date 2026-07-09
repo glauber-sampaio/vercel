@@ -424,14 +424,14 @@ describe('curl', () => {
       });
 
       client.setArgv(
+        '--scope',
+        'my-team',
         'curl',
         '/api/hello',
         '--deployment',
         'dpl_ABC123',
         '--protection-bypass',
-        'test-secret',
-        '--scope',
-        'my-team'
+        'test-secret'
       );
 
       const exitCode = await curl(client);
@@ -956,10 +956,10 @@ describe('parseCurlLikeArgs', () => {
   it('does not pass global scope flags through to curl', () => {
     const parsed = parseCurlLikeArgs(
       [
-        'curl',
-        'https://example.com',
         '--scope',
         'my-team',
+        'curl',
+        'https://example.com',
         '--team=legacy-team',
         '--silent',
       ],
