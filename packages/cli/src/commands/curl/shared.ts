@@ -62,6 +62,7 @@ function orgFromOwner(id: string, slug = id): ProjectLinked['org'] {
 
 const VC_STRING_FLAGS = new Set(['--deployment', '--protection-bypass']);
 const VC_BOOLEAN_FLAGS = new Set(['--yes', '--help', '--trace', '--json']);
+const VC_SCOPE_FLAGS = new Set(['--scope', '--team']);
 
 function flagName(arg: string): string {
   const eqIdx = arg.indexOf('=');
@@ -112,6 +113,17 @@ export function parseCurlLikeArgs(
   for (let i = 0; i < beforeSeparator.length; i++) {
     const arg = beforeSeparator[i];
     const name = flagName(arg);
+
+    // Scope flags are parsed globally by the CLI, but remain in `client.argv`.
+    // Consume their values here so they are not forwarded to curl. We do not
+    // consume the short forms because `-S` and `-T` are valid curl flags.
+    if (VC_SCOPE_FLAGS.has(name)) {
+      const value = flagValue(beforeSeparator, i);
+      if (!arg.includes('=') && value !== undefined) {
+        i++;
+      }
+      continue;
+    }
 
     if (VC_STRING_FLAGS.has(name)) {
       const value = flagValue(beforeSeparator, i);
@@ -490,10 +502,9 @@ export async function getDeploymentUrlAndToken(
           deploymentProtectionToken =
             await getOrCreateDeploymentProtectionToken(client, link);
         } catch (err) {
-          output.error(
-            `Failed to get deployment protection bypass token: ${err instanceof Error ? err.message : String(err)}`
+          output.debug(
+            `Failed to get deployment protection bypass token: ${err}`
           );
-          return 1;
         }
       }
     }
