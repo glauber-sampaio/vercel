@@ -791,11 +791,13 @@ const main = async () => {
     parsedArgs.flags['--scope'] ||
     parsedArgs.flags['--team'] ||
     localConfig?.scope;
+  const buildNeedsRemoteProjectScope =
+    targetCommand === 'build' && Boolean(parsedArgs.flags['--project']);
 
   if (
     typeof scope === 'string' &&
     targetCommand !== 'login' &&
-    targetCommand !== 'build' &&
+    (targetCommand !== 'build' || buildNeedsRemoteProjectScope) &&
     targetCommand !== 'sandbox'
   ) {
     let user = null;

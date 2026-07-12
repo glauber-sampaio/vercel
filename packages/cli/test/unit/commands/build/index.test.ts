@@ -3577,6 +3577,35 @@ writeFileSync(
       ]);
     });
 
+    it('uses the resolved explicit scope instead of a conflicting local link', async () => {
+      const cwd = await getWriteableDirectory();
+      const scopedProject = {
+        ...defaultProject,
+        id: 'prj_scoped',
+        name: 'scoped-project',
+        accountId: 'team_scope',
+      };
+      let requestedTeamId: unknown;
+
+      useUser();
+      useTeams('team_scope');
+      client.config.currentTeam = 'team_scope';
+      client.scenario.get('/v9/projects/scoped-project', (req, res) => {
+        requestedTeamId = req.query.teamId;
+        res.json(scopedProject);
+      });
+      await fs.outputJSON(join(cwd, '.vercel', 'project.json'), {
+        orgId: 'team_stale',
+        projectId: 'prj_stale',
+      });
+
+      client.cwd = cwd;
+      client.setArgv('build', '--project=scoped-project', '--scope=team-scope');
+      await build(client);
+
+      expect(requestedTeamId).toEqual('team_scope');
+    });
+
     it('tracks --project telemetry as [REDACTED]', async () => {
       const cwd = await getWriteableDirectory();
       useUser();
