@@ -75,7 +75,6 @@ export default async function ls(client: Client, argv: string[]) {
   const link = await resolveProjectContext({
     client,
     projectNameOrId: projectName,
-    commandName: 'env ls',
   });
   if (link.status === 'error') {
     return link.exitCode;

@@ -3,6 +3,7 @@ import type Client from './client';
 import { isAPIError, LinkRequiredError, ProjectNotFound } from './errors-ts';
 import { packageName } from './pkg-name';
 import { stripSensitiveAuthArgs } from './redact-args';
+import { withProjectOption } from './projects/with-project-option';
 
 /**
  * Structured payload for "action required" (e.g. scope choice, login passcode).
@@ -262,6 +263,60 @@ export function buildCommandWithGlobalFlags(
     return `${pkgName} ${preserved.join(' ')} ${commandTemplate}`;
   }
   return `${base} ${preserved.join(' ')}`;
+}
+
+/**
+ * Builds a related command with the invoking command's global context and an
+ * optional explicit project selector.
+ */
+export function buildCommandWithProjectContext(
+  argv: string[],
+  commandTemplate: string,
+  projectNameOrId?: string
+): string {
+  return buildCommandWithGlobalFlags(
+    argv,
+    withProjectOption(commandTemplate, projectNameOrId)
+  );
+}
+
+/**
+ * Rebuilds the invoking command for a project-not-found retry. Project and
+ * scope selectors are replaced only on the CLI side of a `--` separator so
+ * required operands and child-command arguments remain intact.
+ */
+export function buildProjectRetryCommand(
+  argv: string[],
+  projectNameOrId: string,
+  scope = '<team-slug>'
+): string {
+  const args = stripSensitiveAuthArgs(argv.slice(2));
+  const separatorIndex = args.indexOf('--');
+  const commandArgs =
+    separatorIndex === -1 ? args : args.slice(0, separatorIndex);
+  const childArgs = separatorIndex === -1 ? [] : args.slice(separatorIndex + 1);
+  const selectors = new Set(['--project', '--scope', '--team', '-S', '-T']);
+  const preserved: string[] = [];
+
+  for (let i = 0; i < commandArgs.length; i++) {
+    const arg = commandArgs[i];
+    const name = arg.includes('=') ? arg.slice(0, arg.indexOf('=')) : arg;
+    if (selectors.has(name)) {
+      if (!arg.includes('=') && i + 1 < commandArgs.length) {
+        i++;
+      }
+      continue;
+    }
+    preserved.push(arg);
+  }
+
+  preserved.push('--project', projectNameOrId);
+  let command = `${packageName} ${preserved.join(' ')} --scope ${scope}`;
+  if (separatorIndex !== -1) {
+    command += ` -- ${childArgs.join(' ')}`;
+  }
+
+  return command;
 }
 
 /**

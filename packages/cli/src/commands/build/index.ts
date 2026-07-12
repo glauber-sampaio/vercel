@@ -362,7 +362,6 @@ export default async function main(client: Client): Promise<number> {
       await printProjectNotFoundError(
         client,
         projectNameOrId,
-        'build',
         linkedFromApi.orgId
       );
       return 1;

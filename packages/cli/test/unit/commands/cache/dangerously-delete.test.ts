@@ -153,7 +153,7 @@ describe('cache dangerously-delete', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to dangerously delete all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache dangerously-delete --tag foo --yes\`.`
+      `You are about to dangerously delete all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache dangerously-delete --tag=foo --yes\`.`
     );
   });
 
@@ -167,7 +167,7 @@ describe('cache dangerously-delete', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to dangerously delete all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache dangerously-delete --tag foo --revalidation-deadline-seconds 60 --yes\`.`
+      `You are about to dangerously delete all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache dangerously-delete --tag=foo --revalidation-deadline-seconds=60 --yes\`.`
     );
   });
 
@@ -224,7 +224,7 @@ describe('cache dangerously-delete', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to dangerously delete all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache dangerously-delete --srcimg /api/avatar/1 --yes\`.`
+      `You are about to dangerously delete all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache dangerously-delete --srcimg=/api/avatar/1 --yes\`.`
     );
   });
 
@@ -238,7 +238,7 @@ describe('cache dangerously-delete', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to dangerously delete all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache dangerously-delete --srcimg /api/avatar/1 --revalidation-deadline-seconds 60 --yes\`.`
+      `You are about to dangerously delete all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache dangerously-delete --srcimg=/api/avatar/1 --revalidation-deadline-seconds=60 --yes\`.`
     );
   });
 

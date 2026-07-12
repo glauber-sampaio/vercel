@@ -32,7 +32,7 @@ describe('printProjectNotFoundError', () => {
         : teams.teams[0].slug;
       client.config.currentTeam = 'team_dummy';
 
-      await printProjectNotFoundError(client, 'foo', 'deploy');
+      await printProjectNotFoundError(client, 'foo');
 
       const stderr = client.stderr.getFullOutput();
       expect(stderr).toContain(
@@ -49,7 +49,7 @@ describe('printProjectNotFoundError', () => {
         new Error('network down')
       );
 
-      await printProjectNotFoundError(client, 'foo', 'deploy');
+      await printProjectNotFoundError(client, 'foo');
 
       const stderr = client.stderr.getFullOutput();
       expect(stderr).toContain(
@@ -71,7 +71,7 @@ describe('printProjectNotFoundError', () => {
         : teams.teams[0].slug;
       client.config.currentTeam = 'team_default';
 
-      await printProjectNotFoundError(client, 'foo', 'deploy', 'team_searched');
+      await printProjectNotFoundError(client, 'foo', 'team_searched');
 
       expect(client.stderr.getFullOutput()).toContain(
         `current scope (${searchedSlug})`
@@ -90,7 +90,7 @@ describe('printProjectNotFoundError', () => {
       (client as { nonInteractive: boolean }).nonInteractive = true;
       client.setArgv('deploy', '--project=foo');
 
-      await printProjectNotFoundError(client, 'foo', 'deploy');
+      await printProjectNotFoundError(client, 'foo');
 
       const stdout = client.stdout.getFullOutput();
       const payload = JSON.parse(stdout);
@@ -115,6 +115,31 @@ describe('printProjectNotFoundError', () => {
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
+    it('preserves operands and replaces CLI selectors in the retry', async () => {
+      useUser();
+      useTeams('team_dummy');
+      (client as { nonInteractive: boolean }).nonInteractive = true;
+      client.setArgv(
+        'flags',
+        'inspect',
+        'checkout',
+        '--project',
+        'missing',
+        '--scope',
+        'old-team',
+        '--token',
+        'secret'
+      );
+
+      await printProjectNotFoundError(client, 'missing');
+
+      const payload = JSON.parse(client.stdout.getFullOutput());
+      expect(payload.next[1].command).toBe(
+        'vercel flags inspect checkout --project missing --scope <team-slug>'
+      );
+      expect(payload.next[1].command).not.toContain('secret');
+    });
+
     it('omits the scope field when getScope fails', async () => {
       vi.spyOn(getScopeModule, 'default').mockRejectedValue(
         new Error('network down')
@@ -122,7 +147,7 @@ describe('printProjectNotFoundError', () => {
       (client as { nonInteractive: boolean }).nonInteractive = true;
       client.setArgv('deploy', '--project=foo');
 
-      await printProjectNotFoundError(client, 'foo', 'deploy');
+      await printProjectNotFoundError(client, 'foo');
 
       const stdout = client.stdout.getFullOutput();
       const payload = JSON.parse(stdout);

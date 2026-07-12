@@ -4,11 +4,11 @@ import { printError } from '../../util/error';
 import { invalidateSubcommand } from './command';
 import { getFlagsSpecification } from '../../util/get-flags-specification';
 import output from '../../output-manager';
-import { getCommandName } from '../../util/pkg-name';
 import { resolveProjectContext } from '../../util/projects/resolve-project-context';
 import { emoji, prependEmoji } from '../../util/emoji';
 import { CacheInvalidateTelemetryClient } from '../../util/telemetry/commands/cache/invalidate';
 import plural from 'pluralize';
+import { buildCommandWithYes } from '../../util/agent-output';
 
 export default async function invalidate(
   client: Client,
@@ -66,19 +66,16 @@ export default async function invalidate(
 
   let itemName = '';
   let itemValue = '';
-  let flag = '';
   let postUrl = '';
   let postBody = {};
   if (tag) {
     itemName = plural('tag', tag.split(',').length, false);
     itemValue = tag;
-    flag = '--tag';
     postUrl = '/v1/edge-cache/invalidate-by-tags';
     postBody = { tags: tag };
   } else if (srcimg) {
     itemName = 'source image';
     itemValue = srcimg;
-    flag = '--srcimg';
     postUrl = '/v1/edge-cache/invalidate-by-src-images';
     postBody = { srcImages: [srcimg] };
   } else {
@@ -90,10 +87,8 @@ export default async function invalidate(
 
   if (!yes) {
     if (!process.stdin.isTTY) {
-      const projectFlag = projectName ? ` --project ${projectName}` : '';
-      output.print(
-        `${msg}. To continue, run ${getCommandName(`cache invalidate ${flag} ${itemValue}${projectFlag} --yes`)}.`
-      );
+      const retryCommand = buildCommandWithYes(client.argv);
+      output.print(`${msg}. To continue, run \`${retryCommand}\`.`);
       return 1;
     }
     const confirmed = await client.input.confirm(`${msg}. Continue?`, true);

@@ -69,12 +69,7 @@ export default async function dev(
           `To link your project, run ${getCommandName('dev')} without \`-L\` or \`--local\` or ${getCommandName('link')}.`
       );
     } else if (projectNameOrId) {
-      await printProjectNotFoundError(
-        client,
-        projectNameOrId,
-        'dev',
-        link.orgId
-      );
+      await printProjectNotFoundError(client, projectNameOrId, link.orgId);
       return 1;
     } else {
       link = await setupAndLink(client, cwd, {

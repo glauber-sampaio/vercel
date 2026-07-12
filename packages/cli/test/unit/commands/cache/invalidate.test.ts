@@ -116,7 +116,28 @@ describe('cache invalidate', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to invalidate all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache invalidate --tag foo --yes\`.`
+      `You are about to invalidate all cached content associated with tag foo for project ${projectId}. To continue, run \`vercel cache invalidate --tag=foo --yes\`.`
+    );
+  });
+
+  it('preserves project and global context in the confirmation retry', async () => {
+    client.setArgv(
+      '--cwd',
+      client.cwd,
+      '--scope',
+      'team_dummy',
+      'cache',
+      'invalidate',
+      '--project',
+      projectId,
+      '--tag=foo'
+    );
+
+    const exitCode = await cache(client);
+
+    expect(exitCode).toEqual(1);
+    await expect(client.stderr).toOutput(
+      `vercel --cwd ${client.cwd} --scope team_dummy cache invalidate --project ${projectId} --tag=foo --yes`
     );
   });
 
@@ -143,7 +164,7 @@ describe('cache invalidate', () => {
     const exitCode = await cache(client);
     expect(exitCode).toEqual(1);
     await expect(client.stderr).toOutput(
-      `You are about to invalidate all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache invalidate --srcimg /api/avatar/1 --yes\`.`
+      `You are about to invalidate all cached content associated with source image /api/avatar/1 for project ${projectId}. To continue, run \`vercel cache invalidate --srcimg=/api/avatar/1 --yes\`.`
     );
   });
 

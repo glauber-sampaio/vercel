@@ -8,6 +8,7 @@ import {
   buildCommandWithScope,
   buildCommandWithYes,
   buildCommandWithGlobalFlags,
+  buildProjectRetryCommand,
   getGlobalFlagsFromArgv,
   enrichActionRequiredWithInvokingCommand,
   type ActionRequiredPayload,
@@ -524,6 +525,31 @@ describe('buildCommandWithGlobalFlags', () => {
     const argv = ['node', 'vc.js', 'deploy', '--scope', 'vercel', '--yes'];
     expect(buildCommandWithGlobalFlags(argv, 'link')).toBe(
       'vercel link --scope vercel --yes'
+    );
+  });
+});
+
+describe('buildProjectRetryCommand', () => {
+  it('replaces CLI selectors without touching child-command selectors', () => {
+    const argv = [
+      'node',
+      'vc.js',
+      'env',
+      'run',
+      '--project=old-project',
+      '--scope',
+      'old-team',
+      '--token',
+      'secret',
+      '--',
+      'npm',
+      'test',
+      '--project',
+      'child-project',
+    ];
+
+    expect(buildProjectRetryCommand(argv, 'new-project')).toBe(
+      'vercel env run --project new-project --scope <team-slug> -- npm test --project child-project'
     );
   });
 });

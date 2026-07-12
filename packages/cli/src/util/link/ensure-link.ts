@@ -82,7 +82,6 @@ export async function ensureLink(
       await printProjectNotFoundError(
         client,
         opts.projectName,
-        commandName,
         (link as ProjectLinkResultWithOrgId).orgId
       );
       return 1;

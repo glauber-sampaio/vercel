@@ -2,7 +2,7 @@ import type Client from '../client';
 import getScope from '../get-scope';
 import output from '../../output-manager';
 import {
-  buildCommandWithGlobalFlags,
+  buildProjectRetryCommand,
   outputAgentError,
   shouldEmitNonInteractiveCommandError,
 } from '../agent-output';
@@ -18,7 +18,6 @@ import getOrgById from './get-org-by-id';
 export async function printProjectNotFoundError(
   client: Client,
   projectNameOrId: string,
-  commandName: string,
   orgId?: string
 ): Promise<void> {
   let contextName: string | undefined;
@@ -50,10 +49,7 @@ export async function printProjectNotFoundError(
     return;
   }
 
-  const retryWithScope = buildCommandWithGlobalFlags(
-    client.argv,
-    `${commandName} --project ${projectNameOrId} --scope <team-slug>`
-  );
+  const retryWithScope = buildProjectRetryCommand(client.argv, projectNameOrId);
 
   outputAgentError(
     client,

@@ -4,10 +4,10 @@ import { printError } from '../../util/error';
 import { purgeSubcommand } from './command';
 import { getFlagsSpecification } from '../../util/get-flags-specification';
 import output from '../../output-manager';
-import { getCommandName } from '../../util/pkg-name';
 import { resolveProjectContext } from '../../util/projects/resolve-project-context';
 import { emoji, prependEmoji } from '../../util/emoji';
 import { CachePurgeTelemetryClient } from '../../util/telemetry/commands/cache/purge';
+import { buildCommandWithYes } from '../../util/agent-output';
 
 export default async function purge(
   client: Client,
@@ -73,10 +73,8 @@ export default async function purge(
 
   if (!yes) {
     if (!process.stdin.isTTY) {
-      const projectFlag = projectName ? ` --project ${projectName}` : '';
-      output.print(
-        `${msg}. To continue, run ${getCommandName(`cache purge${projectFlag} --yes`)}.`
-      );
+      const retryCommand = buildCommandWithYes(client.argv);
+      output.print(`${msg}. To continue, run \`${retryCommand}\`.`);
       return 1;
     }
     const confirmed = await client.input.confirm(`${msg}. Continue?`, true);

@@ -107,7 +107,7 @@ describe('crons run', () => {
       });
     });
 
-    it('errors when cron path not found', async () => {
+    it('preserves an explicit project when suggesting how to find a cron path', async () => {
       mockLinkedProject();
       mockProjectWithCrons([
         {
@@ -116,10 +116,18 @@ describe('crons run', () => {
           schedule: '0 * * * *',
         },
       ]);
-      client.setArgv('crons', 'run', '/api/nonexistent');
+      client.setArgv(
+        'crons',
+        'run',
+        '/api/nonexistent',
+        '--project',
+        'my-project'
+      );
       const exitCode = await crons(client);
       expect(exitCode).toEqual(1);
-      await expect(client.stderr).toOutput('not found');
+      await expect(client.stderr).toOutput(
+        'vercel crons ls --project my-project'
+      );
     });
 
     it('errors when no cron jobs exist', async () => {

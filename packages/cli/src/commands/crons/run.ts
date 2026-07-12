@@ -11,6 +11,7 @@ import { getFlagsSpecification } from '../../util/get-flags-specification';
 import { printError } from '../../util/error';
 import { isAPIError } from '../../util/errors-ts';
 import type { CronJobDefinition } from './types';
+import { buildCommandWithProjectContext } from '../../util/agent-output';
 
 export default async function run(client: Client, argv: string[]) {
   const telemetry = new CronsRunTelemetryClient({
@@ -110,8 +111,13 @@ export default async function run(client: Client, argv: string[]) {
   // Find the matching cron definition to get the schedule
   const cronDef = definitions.find(d => d.path === cronPath);
   if (!cronDef) {
+    const listCommand = buildCommandWithProjectContext(
+      client.argv,
+      'crons ls',
+      projectName
+    );
     output.error(
-      `Cron job with path ${chalk.bold(cronPath)} not found. Run ${getCommandName('crons ls')} to see available cron jobs.`
+      `Cron job with path ${chalk.bold(cronPath)} not found. Run ${listCommand} to see available cron jobs.`
     );
     return 1;
   }
